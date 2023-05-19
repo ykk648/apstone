@@ -3,14 +3,13 @@
 # @Author : ykk648
 # @Project : https://github.com/ykk648/apstone
 
-"""
-todo: io_binding https://onnxruntime.ai/docs/api/python/api_summary.html
-"""
 
 import onnxruntime
 import numpy as np
 from cv2box import MyFpsCounter
 import os
+from pathlib import Path
+import re
 
 
 def get_output_info(onnx_session):
@@ -47,6 +46,8 @@ def get_input_feed(input_name, image_tensor):
 class ONNXModel:
     def __init__(self, onnx_path, provider='gpu', debug=False, input_dynamic_shape=None):
         self.provider = provider
+        onnx_name = Path(onnx_path).stem
+        trt_cache_path = './cache/trt/' + onnx_name
 
         if self.provider == 'gpu':
             self.providers = (
@@ -54,20 +55,20 @@ class ONNXModel:
                 {'device_id': 0, }
             )
         elif self.provider == 'trt':
-            os.makedirs('./cache/trt', exist_ok=True)
+            os.makedirs(trt_cache_path, exist_ok=True)
             self.providers = (
                 'TensorrtExecutionProvider',
-                {'trt_engine_cache_enable': True, 'trt_engine_cache_path': './cache/trt', 'trt_fp16_enable': False, }
+                {'trt_engine_cache_enable': True, 'trt_engine_cache_path': trt_cache_path, 'trt_fp16_enable': False, }
             )
         elif self.provider == 'trt16':
-            os.makedirs('./cache/trt', exist_ok=True)
+            os.makedirs(trt_cache_path, exist_ok=True)
             self.providers = (
                 'TensorrtExecutionProvider',
-                {'trt_engine_cache_enable': True, 'trt_engine_cache_path': './cache/trt', 'trt_fp16_enable': True,
+                {'trt_engine_cache_enable': True, 'trt_engine_cache_path': trt_cache_path, 'trt_fp16_enable': True,
                  'trt_dla_enable': False, }
             )
         elif self.provider == 'trt8':
-            os.makedirs('./cache/trt', exist_ok=True)
+            os.makedirs(trt_cache_path, exist_ok=True)
             self.providers = (
                 'TensorrtExecutionProvider',
                 {'trt_engine_cache_enable': True, 'trt_int8_enable': True, }
@@ -78,7 +79,18 @@ class ONNXModel:
         # onnxruntime.set_default_logger_severity(3)
         session_options = onnxruntime.SessionOptions()
         session_options.log_severity_level = 3
-        self.onnx_session = onnxruntime.InferenceSession(onnx_path, session_options, providers=[self.providers])
+
+        # When env change leads to trt cache load fail, auto generate new cache
+        try:
+            self.onnx_session = onnxruntime.InferenceSession(onnx_path, session_options, providers=[self.providers])
+        except Exception as e:
+            if type(e.args[0])==str and 'TensorRT EP could not deserialize engine from cache' in e.args[0]:
+                res = re.match('.*TensorRT EP could not deserialize engine from cache: (.*)', e.args[0])
+                os.remove(res.group(1))
+                print('waiting generate new model...')
+                self.onnx_session = onnxruntime.InferenceSession(onnx_path, session_options, providers=[self.providers])
+            else:
+                raise e
 
         # sessionOptions.intra_op_num_threads = 3
         self.input_name, self.input_shape = get_input_info(self.onnx_session)
@@ -148,3 +160,30 @@ class ONNXModel:
             bach_image_tensor = bach_image_tensor.transpose(0, 3, 1, 2)
         input_feed = get_input_feed(self.input_name, bach_image_tensor)
         return self.onnx_session.run(self.output_name, input_feed=input_feed)
+
+    def binding_forward(self, binding):
+        """
+        ref io_binding https://onnxruntime.ai/docs/api/python/api_summary.html
+        do io_binding outside this func and pass it in
+        example(cuda in&out):
+            import torch
+            binding = self.model.onnx_session.io_binding()
+            image_tensor_in = image_tensor_in.contiguous()
+            binding.bind_input(
+                name='X',
+                device_type='cuda',
+                device_id=0,
+                element_type=np.float32,
+                shape=tuple(image_tensor_in.shape),
+                buffer_ptr=image_tensor_in.data_ptr(),)
+
+            Y_tensor = torch.empty(Y_shape, dtype=torch.float32, device='cuda:0').contiguous()
+            binding.bind_output(
+                name='Y',
+                device_type='cuda',
+                device_id=0,
+                element_type=np.float32,
+                shape=tuple(Y_tensor.shape),
+                buffer_ptr=Y_tensor.data_ptr(),)
+        """
+        self.onnx_session.run_with_iobinding(binding)
