@@ -17,13 +17,9 @@ class ModelBase:
             self.input_dynamic_shape = None
 
         if 'picklable' in model_info.keys():
-            ONNXModelWrapper = OnnxModelPickable
+            picklable = model_info['picklable']
         else:
-            ONNXModelWrapper = ONNXModel
-
-        if 'encrypt' in model_info.keys():
-            from cv2box.utils.encrypt import CVEncrypt
-            self.model_path = CVEncrypt(model_info['encrypt']).load_encrypt_file(self.model_path)
+            picklable = False
 
         # init model
         if Path(self.model_path).suffix == '.engine':
@@ -40,7 +36,14 @@ class ModelBase:
             self.model = TJMWrapper(self.model_path, provider=provider)
         elif Path(self.model_path).suffix in ['.onnx', '.bin']:
             self.model_type = 'onnx'
-            self.model = ONNXModelWrapper(self.model_path, provider=provider,
-                                          input_dynamic_shape=self.input_dynamic_shape)
+            if not picklable:
+                if 'encrypt' in model_info.keys():
+                    from cv2box.utils.encrypt import CVEncrypt
+                    self.model_path = CVEncrypt(model_info['encrypt']).load_encrypt_file(self.model_path)
+                self.model = ONNXModel(self.model_path, provider=provider,
+                                              input_dynamic_shape=self.input_dynamic_shape)
+            else:
+                self.model = OnnxModelPickable(self.model_path, provider=provider, )
+
         else:
             raise 'check model suffix , support engine/tjm/onnx/bin now.'

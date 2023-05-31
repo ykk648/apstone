@@ -46,8 +46,11 @@ def get_input_feed(input_name, image_tensor):
 class ONNXModel:
     def __init__(self, onnx_path, provider='gpu', debug=False, input_dynamic_shape=None):
         self.provider = provider
-        onnx_name = Path(onnx_path).stem
-        trt_cache_path = './cache/trt/' + onnx_name
+        try:
+            onnx_name = Path(onnx_path).stem
+            trt_cache_path = './cache/trt/' + onnx_name
+        except TypeError:
+            pass
 
         if self.provider == 'gpu':
             self.providers = (

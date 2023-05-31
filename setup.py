@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name='apstone',  # 项目的名称
-    version='0.0.4',  # 项目版本
+    version='0.0.5',  # 项目版本
     author='ykk648',  # 项目作者
     author_email='ykk648@gmail.com',  # 作者email
     url='https://github.com/ykk648/apstone',  # 项目代码仓库
