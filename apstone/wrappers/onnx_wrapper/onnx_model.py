@@ -87,7 +87,7 @@ class ONNXModel:
         try:
             self.onnx_session = onnxruntime.InferenceSession(onnx_path, session_options, providers=[self.providers])
         except Exception as e:
-            if type(e.args[0])==str and 'TensorRT EP could not deserialize engine from cache' in e.args[0]:
+            if type(e.args[0]) == str and 'TensorRT EP could not deserialize engine from cache' in e.args[0]:
                 res = re.match('.*TensorRT EP could not deserialize engine from cache: (.*)', e.args[0])
                 os.remove(res.group(1))
                 print('waiting generate new model...')
@@ -164,6 +164,50 @@ class ONNXModel:
         input_feed = get_input_feed(self.input_name, bach_image_tensor)
         return self.onnx_session.run(self.output_name, input_feed=input_feed)
 
+    def close(self):
+        del self.model
+        self.model = None
+
+    def cuda_binding_forward(self, image_tensor_in_list, output_type='ort'):
+        """
+        Args:
+            image_tensor_in: torch tensor
+        """
+        binding = self.onnx_session.io_binding()
+        for index, image_tensor_in in enumerate(image_tensor_in_list):
+            # image_tensor_in = image_tensor_in.contiguous()
+            if isinstance(image_tensor_in, onnxruntime.capi.onnxruntime_inference_collection.OrtValue):
+                binding.bind_ortvalue_input(self.input_name[index], image_tensor_in)
+            else:
+                import torch
+                assert isinstance(image_tensor_in, torch.Tensor)
+                binding.bind_input(
+                    name=self.input_name[index],
+                    device_type='cuda',
+                    device_id=0,
+                    element_type=np.float32,
+                    shape=self.input_shape[index],
+                    buffer_ptr=image_tensor_in.data_ptr(), )
+        Y_tensor_list = []
+        for index, ouput_name in enumerate(self.output_name):
+            if output_type == 'ort':
+                Y_tensor = onnxruntime.OrtValue.ortvalue_from_shape_and_type(self.output_shape[index], np.float32,
+                                                                             'cuda', 0)
+            else:
+                import torch
+                Y_tensor = torch.empty(self.output_shape[index], dtype=torch.float32, device='cuda:0').contiguous()
+            binding.bind_ortvalue_output(ouput_name, Y_tensor)
+            # binding.bind_output(
+            #     name=ouput_name,
+            #     device_type='cuda',
+            #     device_id=0,
+            #     element_type=np.float32,
+            #     shape=self.output_shape[index],
+            #     buffer_ptr=Y_tensor.data_ptr(), )
+            Y_tensor_list.append(Y_tensor)
+        self.onnx_session.run_with_iobinding(binding)
+        return Y_tensor_list
+
     def binding_forward(self, binding):
         """
         ref io_binding https://onnxruntime.ai/docs/api/python/api_summary.html
@@ -189,4 +233,12 @@ class ONNXModel:
                 shape=tuple(Y_tensor.shape),
                 buffer_ptr=Y_tensor.data_ptr(),)
         """
+        Y_tensor = torch.empty(self.output_shape, dtype=torch.float32, device='cuda:0').contiguous()
+        binding.bind_output(
+            name=self.output_name[0],
+            device_type='cuda',
+            device_id=0,
+            element_type=np.float32,
+            shape=tuple(Y_tensor.shape),
+            buffer_ptr=Y_tensor.data_ptr(), )
         self.onnx_session.run_with_iobinding(binding)

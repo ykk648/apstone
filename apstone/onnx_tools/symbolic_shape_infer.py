@@ -2349,8 +2349,8 @@ class SymbolicShapeInference:
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default='pretrain_models/body_lib/body_bbox_detector/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906_dynamic.onnx', help="The input model file")
-    parser.add_argument("--output", default='pretrain_models/body_lib/body_bbox_detector/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906_dynamic_shape-infer.onnx',help="The output model file")
+    parser.add_argument("--input", default='', help="The input model file")
+    parser.add_argument("--output", default='',help="The output model file")
     parser.add_argument(
         "--auto_merge",
         help="Automatically merge symbolic dims when confliction happens",
