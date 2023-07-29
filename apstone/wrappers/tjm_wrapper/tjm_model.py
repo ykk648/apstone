@@ -20,10 +20,18 @@ class TJMWrapper:
             else:
                 gpu_ids = self.provider
             self.model.to(gpu_ids[0])
-            self.facenet = torch.nn.DataParallel(self.model, gpu_ids)  # multi-GPUs
+            # self.model = torch.nn.DataParallel(self.model, gpu_ids)  # multi-GPUs
 
-    def forward(self, input_):
+    def forward(self, input_list_):
+        """
+        Args:
+            input_list_: input1 or [input1, input2, ...]
+        Returns:
+        """
+        if not isinstance(input_list_, list):
+            input_list_ = [input_list_]
         if self.provider != 'cpu:':
-            input_ = input_.cuda()
+            for index, input_ in enumerate(input_list_):
+                input_list_[index] = input_list_[index].cuda()
         with torch.no_grad():
-            return self.model(input_)
+            return self.model(*input_list_)
