@@ -15,19 +15,23 @@ import re
 def get_output_info(onnx_session):
     output_name = []
     output_shape = []
+    output_type = []
     for node in onnx_session.get_outputs():
         output_name.append(node.name)
         output_shape.append(node.shape)
-    return output_name, output_shape
+        output_type.append(node.type)
+    return output_name, output_shape, output_type
 
 
 def get_input_info(onnx_session):
     input_name = []
     input_shape = []
+    input_type = []
     for node in onnx_session.get_inputs():
         input_name.append(node.name)
         input_shape.append(node.shape)
-    return input_name, input_shape
+        input_type.append(node.type)
+    return input_name, input_shape, input_type
 
 
 def get_input_feed(input_name, image_tensor):
@@ -44,7 +48,7 @@ def get_input_feed(input_name, image_tensor):
 
 
 class ONNXModel:
-    def __init__(self, onnx_path, provider='gpu', debug=False, input_dynamic_shape=None):
+    def __init__(self, onnx_path, provider='gpu', warmup=False, debug=False, input_dynamic_shape=None):
         self.provider = provider
         try:
             onnx_name = Path(onnx_path).stem
@@ -96,8 +100,8 @@ class ONNXModel:
                 raise e
 
         # sessionOptions.intra_op_num_threads = 3
-        self.input_name, self.input_shape = get_input_info(self.onnx_session)
-        self.output_name, self.output_shape = get_output_info(self.onnx_session)
+        self.input_name, self.input_shape, self.input_type = get_input_info(self.onnx_session)
+        self.output_name, self.output_shape, self.output_type = get_output_info(self.onnx_session)
 
         self.input_dynamic_shape = input_dynamic_shape
 
@@ -107,10 +111,11 @@ class ONNXModel:
 
         if debug:
             print('onnx version: {}'.format(onnxruntime.__version__))
-            print("input_name:{}, shape:{}".format(self.input_name, self.input_shape))
-            print("output_name:{}, shape:{}".format(self.output_name, self.output_shape))
+            print("input_name:{}, \nshape:{}, \ntype:{}".format(self.input_name, self.input_shape, self.input_type))
+            print("output_name:{}, \nshape:{}, \ntype:{}".format(self.output_name, self.output_shape, self.output_type))
 
-        self.warm_up()
+        if warmup:
+            self.warm_up()
 
     def warm_up(self):
         if not self.input_dynamic_shape:
