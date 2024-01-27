@@ -56,9 +56,19 @@ class ONNXModel:
         except TypeError:
             pass
 
-        if self.provider == 'gpu':
+        if self.provider in ['gpu', 'cuda']:
             self.providers = (
                 "CUDAExecutionProvider",
+                {'device_id': 0, }
+            )
+        elif self.provider == 'migraphx':
+            self.providers = (
+                "MIGraphXExecutionProvider",
+                {'device_id': 0, }
+            )
+        elif self.provider == 'dml':
+            self.providers = (
+                "DmlExecutionProvider",
                 {'device_id': 0, }
             )
         elif self.provider == 'trt':
