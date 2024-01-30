@@ -120,6 +120,9 @@ class ONNXModel:
                 self.input_dynamic_shape]
 
         if debug:
+            mapping = {'tensor(float16)': np.float16, 'tensor(int64)': np.int64, 'tensor(float)': np.float32, }
+            for inedx, input_type in enumerate(self.input_type):
+                self.input_type[inedx] = mapping[input_type]
             print('onnx version: {}'.format(onnxruntime.__version__))
             print("input_name:{}, \nshape:{}, \ntype:{}".format(self.input_name, self.input_shape, self.input_type))
             print("output_name:{}, \nshape:{}, \ntype:{}".format(self.output_name, self.output_shape, self.output_type))
@@ -141,14 +144,14 @@ class ONNXModel:
 
     def speed_test(self):
         if not self.input_dynamic_shape:
-            input_tensor = [np.random.rand(*self.input_shape[i]).astype(np.float32)
+            input_tensor = [np.random.rand(*self.input_shape[i]).astype(self.input_type[i])
                             for i in range(len(self.input_shape))]
         else:
-            input_tensor = [np.random.rand(*self.input_dynamic_shape[i]).astype(np.float32)
+            input_tensor = [np.random.rand(*self.input_dynamic_shape[i]).astype(self.input_type[i])
                             for i in range(len(self.input_shape))]
 
-        with MyFpsCounter('[{}] onnx 10 times'.format(self.provider)) as mfc:
-            for i in range(10):
+        with MyFpsCounter('[{}] onnx 1000 times'.format(self.provider)) as mfc:
+            for i in range(1000):
                 _ = self.forward(input_tensor)
 
     def forward(self, image_tensor_in, trans=False):
