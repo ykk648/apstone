@@ -113,6 +113,10 @@ class ONNXModel:
         self.input_name, self.input_shape, self.input_type = get_input_info(self.onnx_session)
         self.output_name, self.output_shape, self.output_type = get_output_info(self.onnx_session)
 
+        mapping = {'tensor(float16)': np.float16, 'tensor(int64)': np.int64, 'tensor(float)': np.float32, 'tensor(bool)': np.bool }
+        for inedx, input_type in enumerate(self.input_type):
+            self.input_type[inedx] = mapping[input_type]
+
         self.input_dynamic_shape = input_dynamic_shape
 
         if self.input_dynamic_shape is not None:
@@ -120,9 +124,6 @@ class ONNXModel:
                 self.input_dynamic_shape]
 
         if debug:
-            mapping = {'tensor(float16)': np.float16, 'tensor(int64)': np.int64, 'tensor(float)': np.float32, }
-            for inedx, input_type in enumerate(self.input_type):
-                self.input_type[inedx] = mapping[input_type]
             print('onnx version: {}'.format(onnxruntime.__version__))
             print("input_name:{}, \nshape:{}, \ntype:{}".format(self.input_name, self.input_shape, self.input_type))
             print("output_name:{}, \nshape:{}, \ntype:{}".format(self.output_name, self.output_shape, self.output_type))
@@ -133,12 +134,12 @@ class ONNXModel:
     def warm_up(self):
         if not self.input_dynamic_shape:
             try:
-                self.forward([np.random.rand(*self.input_shape[i]).astype(np.float32)
+                self.forward([np.random.rand(*self.input_shape[i]).astype(self.input_type[i])
                               for i in range(len(self.input_shape))])
             except TypeError:
                 print('Model may be dynamic, plz name the \'input_dynamic_shape\' !')
         else:
-            self.forward([np.random.rand(*self.input_dynamic_shape[i]).astype(np.float32)
+            self.forward([np.random.rand(*self.input_dynamic_shape[i]).astype(self.input_type[i])
                           for i in range(len(self.input_shape))])
         print('Model warm up done !')
 

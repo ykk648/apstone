@@ -21,6 +21,11 @@ class ModelBase:
         else:
             picklable = False
 
+        if 'warmup' in model_info.keys():
+            warmup = model_info['warmup']
+        else:
+            warmup = False
+
         # init model
         if Path(self.model_path).suffix == '.engine':
             if 'trt_wrapper_self' in model_info.keys():
@@ -40,7 +45,7 @@ class ModelBase:
                 if 'encrypt' in model_info.keys():
                     from cv2box.utils.encrypt import CVEncrypt
                     self.model_path = CVEncrypt(model_info['encrypt']).load_encrypt_file(self.model_path)
-                self.model = ONNXModel(self.model_path, provider=provider,
+                self.model = ONNXModel(self.model_path, provider=provider, warmup=warmup,
                                               input_dynamic_shape=self.input_dynamic_shape)
             else:
                 self.model = OnnxModelPickable(self.model_path, provider=provider, )
