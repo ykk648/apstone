@@ -48,7 +48,7 @@ def get_input_feed(input_name, image_tensor):
 
 
 class ONNXModel:
-    def __init__(self, onnx_path, provider='gpu', warmup=False, debug=False, input_dynamic_shape=None):
+    def __init__(self, onnx_path, provider='gpu', warmup=False, debug=False, input_dynamic_shape=None, device=0):
         self.provider = provider
         try:
             onnx_name = Path(onnx_path).stem
@@ -59,17 +59,17 @@ class ONNXModel:
         if self.provider in ['gpu', 'cuda']:
             self.providers = (
                 "CUDAExecutionProvider",
-                {'device_id': 0, }
+                {'device_id': device, }
             )
         elif self.provider == 'migraphx':
             self.providers = (
                 "MIGraphXExecutionProvider",
-                {'device_id': 0, }
+                {'device_id': device, }
             )
         elif self.provider == 'dml':
             self.providers = (
                 "DmlExecutionProvider",
-                {'device_id': 0, }
+                {'device_id': device, }
             )
         elif self.provider == 'trt':
             os.makedirs(trt_cache_path, exist_ok=True)
@@ -113,7 +113,7 @@ class ONNXModel:
         self.input_name, self.input_shape, self.input_type = get_input_info(self.onnx_session)
         self.output_name, self.output_shape, self.output_type = get_output_info(self.onnx_session)
 
-        mapping = {'tensor(float16)': np.float16, 'tensor(int64)': np.int64, 'tensor(float)': np.float32, 'tensor(bool)': np.bool }
+        mapping = {'tensor(float16)': np.float16, 'tensor(int64)': np.int64, 'tensor(float)': np.float32, 'tensor(bool)': bool }
         for inedx, input_type in enumerate(self.input_type):
             self.input_type[inedx] = mapping[input_type]
 
